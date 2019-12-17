@@ -1,0 +1,191 @@
+#include <LiquidCrystal.h>
+#include <TimerOne.h>
+
+
+const byte rs = 12, en = 11, d4 = 4, d5 = 5, d6 = 6, d7 = 7;
+const byte BOT2 = 8;
+const byte BOT3 = 9;
+const byte MOTOR_PWM = 10;
+const byte RELE = 13;
+
+volatile byte ligou;
+volatile int tempatual;
+volatile byte tempo; 
+volatile int rota;
+
+byte estado_BOT2, estado_BOT3;
+
+int pwm;
+int tempdesejada;
+
+long previousMillis = 0;        // Variável de controle do tempo
+long Interval = 1000;
+
+
+char modo[10];
+char str[10];
+char ta[10];
+char td[10];
+char rpm[10];
+
+LiquidCrystal lcd(rs,en,d4,d5,d6,d7);
+
+///////////////////////////////////////SETUP////////////////////////
+
+void setup()
+{ pinMode(BOT2, INPUT_PULLUP);
+  pinMode(BOT3, INPUT_PULLUP);
+  pinMode(2, INPUT_PULLUP);
+  pinMode(3, INPUT_PULLUP);
+  pinMode(MOTOR_PWM, OUTPUT);
+  pinMode(RELE, OUTPUT);
+  Timer1.initialize(1000000);
+  Timer1.attachInterrupt(deutempo);
+  attachInterrupt(digitalPinToInterrupt(2),ligar, FALLING);
+  attachInterrupt(digitalPinToInterrupt(3),PULSOS_RPM, FALLING);
+  lcd.begin(16,2);
+  lcd.clear();
+  lcd.setCursor(0,0);
+  tempatual = 0;
+  tempo = 0;
+   ligou = 0;
+   tempdesejada = 20;
+   estado_BOT2 = digitalRead(BOT2);
+   estado_BOT3 = digitalRead(BOT3);
+   rota = 0;
+   pwm = 0;
+}
+
+/////////////////////////LOOP///////////////////////////////////////////
+
+void loop()
+{
+  
+  if(!ligou)
+  {
+    lcd.clear();
+    sprintf(str, "MOD:OFF");
+    lcd.setCursor(8,1);
+    lcd.print(str);
+    digitalWrite(RELE, LOW);
+  }
+
+if(ligou)
+{
+	digitalWrite(RELE, HIGH);
+	
+  if(estado_BOT2 != digitalRead(BOT2))
+  {delay(5);
+    estado_BOT2 = digitalRead(BOT2);
+    if(estado_BOT2 == LOW)
+    {
+    tempdesejada++;
+  }}
+if(estado_BOT3 != digitalRead(BOT3))
+  {delay(5);
+    estado_BOT3 = digitalRead(BOT3);
+    if(estado_BOT3 == LOW)
+    {
+    tempdesejada--;
+  }}
+
+  SINAL_PWM();
+
+if(tempo)
+{
+tempo = 0;
+recontar_temp();
+PULSOS_RPM();
+lcd_total();
+lcd_rpm();
+rota = 0;
+}
+}
+}
+
+void SINAL_PWM()
+{ 
+  if(tempatual > tempdesejada)
+  {
+    if(pwm < 255)
+    pwm++;
+  }
+  else if(tempatual < tempdesejada)
+  {
+    if(pwm > 0 )
+    pwm--;
+  }
+
+  analogWrite(MOTOR_PWM, pwm);
+}
+
+////////////////////////////FUNCOES//////////////////////////////////////
+
+
+void ligar()
+{
+  ligou = !ligou;
+}
+void deutempo()
+{
+  tempo+= 1;
+}
+
+/////////////////////////////////////////////////////////////////////
+
+void recontar_temp()
+{
+  tempatual= analogRead(0);
+  tempatual= (tempatual*500)/1023;
+}
+/////////////////////////////////////////////////////////////////////
+void PULSOS_RPM()
+{
+  rota++;
+}
+
+//////////////////////////////////////////////////////////////////////
+
+void lcd_total()
+{
+  unsigned long currentMillis = millis();
+  if (currentMillis - previousMillis > Interval) 
+ { 
+  previousMillis = currentMillis;
+  
+  lcd.clear();
+  sprintf(modo,"M:ON");
+  lcd_modo();
+    sprintf(ta,"TA:%i", tempatual);
+  lcd_ta();
+    sprintf(td,"TD:%i", tempdesejada);
+  lcd_td();
+}
+
+}
+
+
+void lcd_modo()
+{
+  lcd.setCursor(8,1);
+  lcd.print(modo);  
+}
+
+void lcd_ta()
+{
+  lcd.setCursor(0,0);
+  lcd.print(ta); 
+}
+
+void lcd_td()
+{
+  lcd.setCursor(8,0);
+  lcd.print(td); 
+}
+
+void lcd_rpm()
+{ 
+  sprintf(rpm,"RPM:%i", rota*60);
+  lcd.setCursor(0,1);
+  lcd.print(rpm);
+}
